@@ -38,6 +38,8 @@
 struct ns_callback {
 	int (*nsread)(void *ns, unsigned lane,
 		void *buf, size_t count, uint64_t off);
+	void *(*nsread_direct)(void *ns, unsigned lane,
+		size_t count, uint64_t off);
 	int (*nswrite)(void *ns, unsigned lane,
 		const void *buf, size_t count, uint64_t off);
 	int (*nszero)(void *ns, unsigned lane, size_t count, uint64_t off);
@@ -55,6 +57,7 @@ struct btt *btt_init(uint64_t rawsize, uint32_t lbasize, uint8_t parent_uuid[],
 unsigned btt_nlane(struct btt *bttp);
 size_t btt_nlba(struct btt *bttp);
 int btt_read(struct btt *bttp, unsigned lane, uint64_t lba, void *buf);
+void * btt_read_direct(struct btt *bttp, unsigned lane, uint64_t lba);
 int btt_write(struct btt *bttp, unsigned lane, uint64_t lba, const void *buf);
 int btt_set_zero(struct btt *bttp, unsigned lane, uint64_t lba);
 int btt_set_error(struct btt *bttp, unsigned lane, uint64_t lba);

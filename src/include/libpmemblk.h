@@ -8,7 +8,8 @@
  *     * Redistributions of source code must retain the above copyright
  *       notice, this list of conditions and the following disclaimer.
  *
- *     * Redistributions in binary form must reproduce the above copyright
+ 
+ * Redistributions in binary form must reproduce the above copyright
  *       notice, this list of conditions and the following disclaimer in
  *       the documentation and/or other materials provided with the
  *       distribution.
@@ -138,6 +139,7 @@ void pmemblk_close(PMEMblkpool *pbp);
 size_t pmemblk_bsize(PMEMblkpool *pbp);
 size_t pmemblk_nblock(PMEMblkpool *pbp);
 int pmemblk_read(PMEMblkpool *pbp, void *buf, long long blockno);
+void *pmemblk_read_direct(PMEMblkpool *pbp, long long blockno);
 int pmemblk_write(PMEMblkpool *pbp, const void *buf, long long blockno);
 int pmemblk_set_zero(PMEMblkpool *pbp, long long blockno);
 int pmemblk_set_error(PMEMblkpool *pbp, long long blockno);

@@ -108,6 +108,29 @@ nsread(void *ns, unsigned lane, void *buf, size_t count, uint64_t off)
 }
 
 /*
+ * nsread_direct -- (internal) read data from the namespace encapsulating the BTT
+ *
+ * This routine is provided to btt_init() to allow the btt module to
+ * do I/O on the memory pool containing the BTT layout.
+ */
+static void *
+nsread_direct(void *ns, unsigned lane, size_t count, uint64_t off)
+{
+	struct pmemblk *pbp = (struct pmemblk *)ns;
+
+	LOG(13, "pbp %p lane %u count %zu off %" PRIu64, pbp, lane, count, off);
+
+	if (off + count > pbp->datasize) {
+		ERR("offset + count (%zu) past end of data area (%zu)",
+				(size_t)off + count, pbp->datasize);
+		errno = EINVAL;
+		return NULL;
+	}
+
+	return (char *)pbp->data + off;
+}
+
+/*
  * nswrite -- (internal) write data to the namespace encapsulating the BTT
  *
  * This routine is provided to btt_init() to allow the btt module to
@@ -256,6 +279,7 @@ nszero(void *ns, unsigned lane, size_t count, uint64_t off)
 /* callbacks for btt_init() */
 static struct ns_callback ns_cb = {
 	.nsread = nsread,
+	.nsread_direct = nsread_direct,
 	.nswrite = nswrite,
 	.nszero = nszero,
 	.nsmap = nsmap,
@@ -681,6 +705,30 @@ pmemblk_read(PMEMblkpool *pbp, void *buf, long long blockno)
 	return err;
 }
 
+/*
+ * pmemblk_read_direct - return a direct pointer to a block in a block memory pool
+ */
+void *
+pmemblk_read_direct(PMEMblkpool *pbp, long long blockno)
+{
+	LOG(3, "pbp %p blockno %lld", pbp, blockno);
+
+	if (blockno < 0) {
+		ERR("negative block number");
+		errno = EINVAL;
+		return NULL;
+	}
+
+	unsigned lane;
+
+	lane_enter(pbp, &lane);
+
+	void * block_pointer = btt_read_direct(pbp->bttp, lane, (uint64_t)blockno);
+
+	lane_exit(pbp, lane);
+
+	return block_pointer;
+}
 /*
  * pmemblk_write -- write a block (atomically) in a block memory pool
  */

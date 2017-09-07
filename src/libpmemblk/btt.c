@@ -1617,6 +1617,68 @@ btt_read(struct btt *bttp, unsigned lane, uint64_t lba, void *buf)
 }
 
 /*
+ * btt_read_direct - returns a pointer to a block from a btt namespace
+ */
+void *
+btt_read_direct(struct btt *bttp, unsigned lane, uint64_t lba)
+{
+	LOG(3, "bttp %p lane %u lba %" PRIu64, bttp, lane, lba);
+
+	if (invalid_lba(bttp, lba))
+		return NULL;
+
+	/* if there's no layout written yet, all reads come back as zeros */
+	if (!bttp->laidout)
+		return NULL;
+
+	/* find which arena LBA lives in, and the offset to the map entry */
+	struct arena *arenap;
+	uint32_t premap_lba;
+	uint64_t map_entry_off;
+	if (lba_to_arena_lba(bttp, lba, &arenap, &premap_lba) < 0)
+		return NULL;
+
+	/* convert pre-map LBA into an offset into the map */
+	map_entry_off = arenap->mapoff + BTT_MAP_ENTRY_SIZE * premap_lba;
+
+	/*
+	 * Read the current map entry to get the post-map LBA for the data
+	 * block read.
+	 */
+	uint32_t entry;
+
+	if ((*bttp->ns_cbp->nsread)(bttp->ns, lane, &entry,
+				sizeof(entry), map_entry_off) < 0)
+		return NULL;
+
+	entry = le32toh(entry);
+
+	/*
+	 * Retries come back to the top of this loop (for a rare case where
+	 * the map is changed by another thread doing writes to the same LBA).
+	 */
+	while (1) {
+		if (map_entry_is_error(entry)) {
+			ERR("EIO due to map entry error flag");
+			errno = EIO;
+			return NULL;
+		}
+
+		if (map_entry_is_zero_or_initial(entry))
+			return NULL;
+
+	}
+
+	uint64_t data_block_off =
+		arenap->dataoff + (uint64_t)(entry & BTT_MAP_ENTRY_LBA_MASK) *
+		arenap->internal_lbasize;
+	
+        LOG(13, "pbp %p lane %u count %u off %" PRIu64, bttp->ns, lane, bttp->lbasize, data_block_off);
+	return  (*bttp->ns_cbp->nsread_direct)(bttp->ns, lane, 
+					bttp->lbasize, data_block_off);
+}
+
+/*
  * map_lock -- (internal) grab the map_lock and read a map entry
  */
 static int
